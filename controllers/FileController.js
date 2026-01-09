@@ -1,68 +1,29 @@
+const uploadService = require("../services/uploadService");
+
 class FileController {
-  constructor(fileService) {
-    this.fileService = fileService;
-  }
-
-  async saveFileInfo(req, res) {
-    try {
-      const fileData = req.body;
-
-      // 基本数据验证
-      if (!fileData || Object.keys(fileData).length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: "请求数据不能为空",
-        });
-      }
-
-      // 验证必需字段
-      const requiredFields = ["name", "type", "size", "lastModified"];
-      const missingFields = requiredFields.filter((field) => !fileData[field]);
-
-      if (missingFields.length > 0) {
-        return res.status(400).json({
-          success: false,
-          message: `缺少必需字段: ${missingFields.join(", ")}`,
-        });
-      }
-
-      const result = await this.fileService.saveFile(fileData);
-
-      if (result.success) {
-        res.status(201).json(result);
-      } else {
-        res.status(400).json(result);
-      }
-    } catch (error) {
-      console.error("控制器错误:", error);
-      res.status(500).json({
-        success: false,
-        message: "服务器内部错误",
-        error: error.message,
-      });
-    }
-  }
-
-  async getFileInfo(req, res) {
+  /**
+   * 获取单个文件信息
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   */
+  async getFile(req, res) {
     try {
       const { id } = req.params;
+      const fileInfo = await uploadService.getFileInfo(id);
 
-      if (!id || isNaN(parseInt(id))) {
-        return res.status(400).json({
+      if (!fileInfo) {
+        return res.status(404).json({
           success: false,
-          message: "无效的文件ID",
+          message: "文件未找到",
         });
       }
 
-      const result = await this.fileService.getFileById(parseInt(id));
-
-      if (result.success) {
-        res.status(200).json(result);
-      } else {
-        res.status(404).json(result);
-      }
+      res.json({
+        success: true,
+        data: fileInfo,
+      });
     } catch (error) {
-      console.error("获取文件信息错误:", error);
+      console.error("获取文件信息时出错:", error);
       res.status(500).json({
         success: false,
         message: "服务器内部错误",
@@ -70,18 +31,70 @@ class FileController {
     }
   }
 
-  async getFileList(req, res) {
+  /**
+   * 获取文件列表
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   */
+  async getFiles(req, res) {
     try {
-      const { limit = 100, offset = 0 } = req.query;
-
-      const result = await this.fileService.getAllFiles(
-        parseInt(limit),
-        parseInt(offset)
-      );
-
-      res.status(200).json(result);
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 20;
+      
+      const files = await uploadService.getAllFiles(page, limit);
+      
+      res.json({
+        success: true,
+        data: files,
+        pagination: {
+          page,
+          limit,
+        },
+      });
     } catch (error) {
-      console.error("获取文件列表错误:", error);
+      console.error("获取文件列表时出错:", error);
+      res.status(500).json({
+        success: false,
+        message: "服务器内部错误",
+      });
+    }
+  }
+  
+  /**
+   * 删除文件
+   * @param {import('express').Request} req
+   * @param {import('express').Response} res
+   */
+  async deleteFile(req, res) {
+    try {
+      const { id } = req.params;
+      
+      // 先查找文件
+      const fileInfo = await uploadService.getFileInfo(id);
+      
+      if (!fileInfo) {
+        return res.status(404).json({
+          success: false,
+          message: "文件未找到",
+        });
+      }
+      
+      // 从数据库删除
+      const File = require("../models/File");
+      await File.deleteById(id);
+      
+      // 从磁盘删除文件
+      const fs = require("fs").promises;
+      const path = require("path");
+      const filePath = path.join(__dirname, "..", "uploads", id);
+      await fs.unlink(filePath).catch(() => {}); // 忽略文件不存在的错误
+      
+      res.json({
+        success: true,
+        message: "文件删除成功",
+      });
+    } catch (error) {
+      console.error("删除文件时出错:", error);
       res.status(500).json({
         success: false,
         message: "服务器内部错误",
@@ -90,4 +103,4 @@ class FileController {
   }
 }
 
-module.exports = FileController;
+module.exports = new FileController();

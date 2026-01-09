@@ -18,14 +18,46 @@ class Database {
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        acquireTimeout: 60000,
-        timeout: 60000,
-        reconnect: true,
       });
 
       console.log("数据库连接池创建成功");
+
+      // 初始化数据库表
+      this.initTables();
     } catch (error) {
       console.error("数据库连接池创建失败:", error);
+      throw error;
+    }
+  }
+
+  async initTables() {
+    // 删除旧的files表（如果有）
+    const dropTableSQL = `DROP TABLE IF EXISTS files`;
+
+    // 创建新的files表
+    const createFilesTableSQL = `
+      CREATE TABLE files (
+        id VARCHAR(255) PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        size BIGINT NOT NULL,
+        created_at DATETIME NOT NULL,
+        mime_type VARCHAR(100),
+        is_image BOOLEAN DEFAULT FALSE,
+        width INT NULL,
+        height INT NULL,
+        color_space VARCHAR(20) NULL,
+        channels TINYINT NULL,
+        INDEX idx_created_at (created_at),
+        INDEX idx_is_image (is_image)
+      )
+    `;
+
+    try {
+      await this.pool.execute(dropTableSQL);
+      await this.pool.execute(createFilesTableSQL);
+      console.log("文件表创建成功");
+    } catch (error) {
+      console.error("创建文件表时出错:", error);
       throw error;
     }
   }

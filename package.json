@@ -8,14 +8,22 @@
     "dev": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["nodejs", "mysql", "backend"],
+  "keywords": [
+    "nodejs",
+    "mysql",
+    "backend"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "mysql2": "^3.6.0",
     "cors": "^2.8.5",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "@tus/server": "^1.0.0",
+    "@tus/file-store": "^1.0.0",
+    "sharp": "^0.32.0",
+    "image-size": "^1.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

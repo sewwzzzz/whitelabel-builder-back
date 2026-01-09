@@ -5,9 +5,6 @@ require("dotenv").config();
 // 导入数据库配置（这会初始化连接池）
 const db = require("./config/database");
 
-// 导入路由
-const fileRoutes = require("./routes/fileRoutes");
-
 class Server {
   constructor() {
     this.app = express();
@@ -27,19 +24,41 @@ class Server {
   }
 
   setupMiddleware() {
-    // CORS配置
+    // CORS配置，更好地支持Tus协议
     this.app.use(
       cors({
         origin: "http://localhost:5173",
         credentials: true,
+        methods: ["GET", "PUT", "POST", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+        allowedHeaders: [
+          "Content-Type",
+          "Authorization",
+          "Upload-Length",
+          "Upload-Offset",
+          "Tus-Resumable",
+          "Upload-Metadata",
+          "Location",
+          "X-HTTP-Method-Override",
+          "X-Requested-With",
+        ],
+        exposedHeaders: [
+          "Location",
+          "Tus-Resumable",
+          "Upload-Offset",
+          "File-ID",
+          "File-Is-Image",
+          "File-Width",
+          "File-Height",
+          "File-Color-Space",
+        ],
       })
     );
 
     // 解析JSON请求体
-    this.app.use(express.json({ limit: "10mb" }));
+    this.app.use(express.json({ limit: "50mb" }));
 
     // 解析URL编码的请求体
-    this.app.use(express.urlencoded({ extended: true }));
+    this.app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
     // 请求日志
     this.app.use((req, res, next) => {
@@ -49,6 +68,14 @@ class Server {
   }
 
   setupRoutes() {
+    // 导入路由
+    const uploadRoutes = require("./routes/upload");
+    const fileRoutes = require("./routes/files");
+
+    // 挂载路由
+    this.app.use("/", uploadRoutes);
+    this.app.use("/api", fileRoutes);
+
     // 健康检查端点
     this.app.get("/health", (req, res) => {
       res.status(200).json({
@@ -57,9 +84,6 @@ class Server {
         service: "WhiteLabel Builder Backend",
       });
     });
-
-    // API路由
-    this.app.use("/api", fileRoutes);
 
     // 404处理
     this.app.use("*", (req, res) => {
@@ -74,6 +98,12 @@ class Server {
     // 全局错误处理
     this.app.use((error, req, res, next) => {
       console.error("全局错误:", error);
+      
+      // 如果响应头已经发送，则不能再次设置响应头
+      if (res.headersSent) {
+        return next(error);
+      }
+      
       res.status(500).json({
         success: false,
         message: "服务器内部错误",
